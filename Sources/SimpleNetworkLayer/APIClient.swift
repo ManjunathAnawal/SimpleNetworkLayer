@@ -18,15 +18,92 @@ import Combine
  It also Log all networks request and errors in console
  */
 
+
+
+enum Log {
+    enum LogLevel {
+        case info
+        case warning
+        case error
+        
+        fileprivate var prefix: String {
+            switch self {
+            case .info:    return "ℹ️ INFO"
+            case .warning: return "⚠️ WARN"
+            case .error:   return "❌ ALERT"
+            }
+        }
+    }
+    
+    struct Context {
+        let file: String
+        let function: String
+        let line: Int
+        var description: String {
+            return "\((file as NSString).lastPathComponent): \(line) \(function)"
+        }
+    }
+   
+    static func info(_ str: String, shouldLogContext: Bool = true, file: String = #file, function: String = #function, line: Int = #line) {
+        let context = Context(file: file, function: function, line: line)
+        Log.handleLog(level: .info, str: str.description, shouldLogContext: shouldLogContext, context: context)
+    }
+    
+    static func warning(_ str: String, shouldLogContext: Bool = true, file: String = #file, function: String = #function, line: Int = #line) {
+        let context = Context(file: file, function: function, line: line)
+        Log.handleLog(level: .warning, str: str.description, shouldLogContext: shouldLogContext, context: context)
+    }
+    
+    static func error(_ str: String, shouldLogContext: Bool = true, file: String = #file, function: String = #function, line: Int = #line) {
+        let context = Context(file: file, function: function, line: line)
+        Log.handleLog(level: .error, str: str.description, shouldLogContext: shouldLogContext, context: context)
+    }
+
+    fileprivate static func handleLog(level: LogLevel, str: String, shouldLogContext: Bool, context: Context) {
+        let logComponents = ["[\(level.prefix)]", str]
+        
+        var fullString = logComponents.joined(separator: " ")
+        if shouldLogContext {
+            fullString += " ➜ \(context.description)"
+        }
+        
+        #if DEBUG
+        print(fullString)
+        #endif
+    }
+}
+
+
+enum ContentType: String {
+    case json = "application/json"
+    case xwwwformurlencoded = "application/x-www-form-urlencoded"
+}
+
+final class APIConstants {
+    static var basedURL: String = "https://dummyjson.com"
+}
+
+
+enum HTTPHeaderField: String {
+    case authentication = "Authentication"
+    case contentType = "Content-Type"
+    case acceptType = "Accept"
+    case acceptEncoding = "Accept-Encoding"
+    case authorization = "Authorization"
+    case acceptLanguage = "Accept-Language"
+    case userAgent = "User-Agent"
+}
+
+
 // The Request Method
-enum HTTPMethod: String {
+public enum HTTPMethod: String {
     case get     = "GET"
     case post    = "POST"
     case put     = "PUT"
     case delete  = "DELETE"
 }
 
-enum NetworkRequestError: LocalizedError, Equatable {
+public enum NetworkRequestError: LocalizedError, Equatable {
     case invalidRequest
     case badRequest
     case unauthorized
@@ -54,7 +131,7 @@ extension Encodable {
 }
 
 // Our Request Protocol
-protocol Request {
+public protocol Request {
     var path: String { get }
     var method: HTTPMethod { get }
     var contentType: String { get }
@@ -115,7 +192,7 @@ extension Request {
     }
 }
 
-struct NetworkDispatcher {
+public struct NetworkDispatcher {
     
     let urlSession: URLSession!
     
@@ -126,7 +203,8 @@ struct NetworkDispatcher {
     /// Dispatches an URLRequest and returns a publisher
     /// - Parameter request: URLRequest
     /// - Returns: A publisher with the provided decoded data or an error
-        func dispatch1<ReturnType: Codable>(request: URLRequest) -> AnyPublisher<ReturnType, NetworkRequestError> {
+    @available(macOS 10.15, *)
+    func dispatch1<ReturnType: Codable>(request: URLRequest) -> AnyPublisher<ReturnType, NetworkRequestError> {
             //Log Request
             print("[\(request.httpMethod?.uppercased() ?? "")] '\(request.url!)'")
             return urlSession
@@ -185,6 +263,7 @@ struct NetworkDispatcher {
 //        }
 //
 //    }
+    @available(macOS 10.15, *)
     func dispatch<ReturnType: Codable>(request: URLRequest) -> AnyPublisher<ReturnType, NetworkRequestError> {
         //Log Request
         print("[\(request.httpMethod?.uppercased() ?? "")] '\(request.url!)'")
@@ -261,6 +340,7 @@ struct APIClient {
     /// Dispatches a Request and returns a publisher
     /// - Parameter request: Request to Dispatch
     /// - Returns: A publisher containing decoded data or an error
+    @available(macOS 10.15, *)
     static func dispatch<R: Request>(_ request: R) -> AnyPublisher<R.ReturnType, NetworkRequestError> {
         guard let urlRequest = request.asURLRequest(baseURL: APIConstants.basedURL) else {
             return Fail(outputType: R.ReturnType.self, failure: NetworkRequestError.badRequest).eraseToAnyPublisher()
